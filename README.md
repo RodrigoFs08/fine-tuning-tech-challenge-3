@@ -1,60 +1,179 @@
-# Tech Challenge Fase 3 - Fine-tuning de Foundation Model
-
+# Fine-Tuning de Foundation Model para Descrição de Produtos da Amazon
 ## Link para o vídeo de demonstração
-[Link do YouTube]()
+[Link do YouTube](https://youtu.be/1Oh-KqStLgk)
 
-## O Problema
+## Sobre o Projeto
 
-No Tech Challenge desta fase, foi necessário executar o fine-tuning de um foundation model (Llama, BERT, MISTRAL etc.), utilizando o dataset "The AmazonTitles-1.3MM". O modelo treinado deveria:
+Este projeto implementa o fine-tuning de um foundation model (Llama-3.2-1B-Instruct) utilizando o dataset "AmazonTitles-1.3MM". O objetivo é treinar o modelo para receber perguntas sobre títulos de produtos da Amazon e gerar respostas precisas com suas descrições, baseando-se no conhecimento adquirido durante o processo de fine-tuning.
 
-- Receber perguntas com um contexto obtido por meio do arquivo json "trn.json" contido dentro do dataset.
-- A partir do prompt formado pela pergunta do usuário sobre o título do produto, o modelo deveria gerar uma resposta baseada na pergunta do usuário, trazendo como resultado do aprendizado do fine-tuning os dados da sua descrição.
+## Problema Abordado
 
-## Fluxo de Trabalho
+O desafio consiste em criar um modelo capaz de:
+- Receber perguntas com contexto obtido do arquivo "trn.json" contido no dataset
+- Gerar respostas baseadas na pergunta do usuário sobre o título do produto
+- Retornar como resultado a descrição do produto correspondente
 
-### 1. Escolha do Dataset
-**Descrição**: O dataset The AmazonTitles-1.3MM consiste em consultas textuais reais de usuários e títulos associados de produtos relevantes encontrados na Amazon e suas descrições, medidos por ações implícitas ou explícitas dos usuários.
+## Dataset Utilizado
 
-### 2. Preparação do Dataset
-- Download do dataset AmazonTitles-1.3MM e utilização do arquivo "trn.json"
-- Utilização das colunas "title" e "content", que contêm título e descrição respectivamente
-- Preparação dos prompts para o fine-tuning, garantindo que estejam organizados de maneira adequada para o treinamento do modelo escolhido
-- Limpeza e pré-processamento dos dados conforme necessário para o modelo escolhido
+**The AmazonTitles-1.3MM**
+- Consiste em consultas textuais reais de usuários e títulos associados de produtos relevantes encontrados na Amazon
+- Contém títulos e descrições de produtos, medidos por ações implícitas ou explícitas dos usuários
+- Para este projeto, utilizamos uma amostra do dataset (trn-amostra.jsonl)
 
-### 3. Chamada do Foundation Model
-- Importação do foundation model utilizado
-- Teste apresentando o resultado atual do modelo antes do treinamento (para obter uma base de análise após o fine-tuning)
-- Avaliação da diferença do resultado gerado após o fine-tuning
+### Estrutura do Dataset
+- **uid**: ID único do item
+- **title**: Título do produto
+- **content**: Descrição do produto
+- **target_ind** e **target_rel**: Índices e relevância para modelos de recuperação
 
-### 4. Execução do Fine-Tuning
-- Execução do fine-tuning do foundation model selecionado utilizando o dataset preparado
-- Documentação do processo de fine-tuning, incluindo os parâmetros utilizados e ajustes específicos realizados no modelo
+## Preparação dos Dados
 
-### 5. Geração de Respostas
-- Configuração do modelo treinado para receber perguntas dos usuários
-- Geração de respostas baseadas nas perguntas do usuário e nos dados provenientes do fine-tuning, incluindo as fontes fornecidas
+1. Carregamento do dataset a partir do arquivo JSONL
+2. Filtragem de entradas com descrição vazia
+3. Criação de uma estrutura de prompt/response para o fine-tuning
+   - Prompt: "What is the description of product {título}?"
+   - Response: Descrição do produto
+4. Conversão para o formato Hugging Face Dataset
+5. Formatação dos dados usando o template Alpaca para instrução
 
-## Implementação
+## Modelo Utilizado
 
-A implementação deste projeto foi realizada utilizando o notebook `tech_challenge_3.ipynb`, que contém todo o código necessário para:
+- **Modelo Base**: unsloth/Llama-3.2-1B-Instruct-bnb-4bit
+- **Quantização**: 4-bit para reduzir o uso de memória
+- **Comprimento Máximo de Sequência**: 2048 tokens
+- **Técnica de Fine-Tuning**: LoRA (Low-Rank Adaptation) para PEFT (Parameter-Efficient Fine-Tuning)
 
-1. Carregar e preparar os dados do dataset AmazonTitles-1.3MM
-2. Configurar e inicializar o foundation model escolhido
-3. Executar o processo de fine-tuning
-4. Avaliar o desempenho do modelo antes e depois do fine-tuning
-5. Demonstrar a geração de respostas baseadas em perguntas do usuário
+### Parâmetros LoRA
+- **r**: 16 (rank da matriz de adaptação)
+- **lora_alpha**: 16 (escala de adaptação)
+- **lora_dropout**: 0 (sem dropout para estabilidade)
+- **Módulos Alvo**: Projeções de atenção (q_proj, k_proj, v_proj, o_proj) e MLP (gate_proj, up_proj, down_proj)
 
-## Como Executar
+## Processo de Fine-Tuning
 
-1. Clone este repositório
-2. Certifique-se de ter todas as dependências instaladas (listadas no notebook)
-3. Execute o notebook `tech_challenge_3.ipynb` em um ambiente Jupyter ou Google Colab
-4. Siga as instruções no notebook para cada etapa do processo
+O fine-tuning foi realizado utilizando a biblioteca TRL (Transformer Reinforcement Learning) com o SFTTrainer (Supervised Fine-Tuning Trainer).
 
-## Resultados
+### Parâmetros de Treinamento
+- **Batch Size**: 2 por dispositivo
+- **Gradient Accumulation Steps**: 4 (efetivamente um batch size de 8)
+- **Learning Rate**: 2e-4
+- **Warmup Steps**: 5
+- **Max Steps**: 60 (limitado para testes rápidos)
+- **Otimizador**: AdamW 8-bit (para eficiência de memória)
+- **Precisão**: BF16 (bfloat16)
 
-Os resultados obtidos demonstram a eficácia do fine-tuning do modelo escolhido para a tarefa de geração de respostas baseadas em títulos de produtos da Amazon. O modelo consegue compreender o contexto da pergunta do usuário e fornecer informações relevantes extraídas das descrições dos produtos.
+O fine-tuning foi realizado com PEFT (Parameter-Efficient Fine-Tuning) usando LoRA, o que permitiu treinar apenas uma pequena fração dos parâmetros do modelo (cerca de 1.13% dos parâmetros totais).
 
-## Conclusão
+## Avaliação do Modelo
 
-Este projeto demonstra a aplicação prática de técnicas de fine-tuning em foundation models para tarefas específicas de processamento de linguagem natural, especificamente para a geração de respostas contextualizadas sobre produtos com base em seus títulos e descrições.
+Após o fine-tuning, o modelo foi avaliado em exemplos de teste para verificar sua capacidade de gerar descrições precisas com base nos títulos dos produtos. Comparamos as respostas geradas antes e depois do fine-tuning.
+
+### Exemplos de Teste
+- "What is the description of product Girls Ballet Tutu?"
+- "What is the description of product The Wall: Images and Offerings from the Vietnam Veterans Memorial?"
+
+### Resultados
+Os resultados mostraram que o modelo fine-tuned é capaz de gerar descrições mais precisas e relevantes para os títulos dos produtos em comparação com o modelo base.
+
+## Tecnologias Utilizadas
+
+- **Unsloth**: Para otimização do modelo Llama
+- **PEFT**: Para fine-tuning eficiente em parâmetros
+- **Transformers**: Para manipulação do modelo e tokenizer
+- **TRL**: Para treinamento supervisionado
+- **Datasets**: Para manipulação do dataset
+- **Bitsandbytes**: Para quantização de 4-bit
+- **PyTorch**: Como framework de deep learning
+
+## Como Reproduzir
+
+1. Instale as dependências necessárias:
+```bash
+pip install -q unsloth accelerate peft trl bitsandbytes transformers datasets
+pip uninstall -y bitsandbytes
+pip install bitsandbytes --prefer-binary --upgrade --no-cache-dir
+```
+
+2. Prepare o dataset:
+   - Baixe o dataset AmazonTitles-1.3MM ou utilize a amostra fornecida (trn-amostra.jsonl)
+   - Execute o código de preparação de dados conforme o notebook
+
+3. Carregue o modelo e configure o LoRA:
+```python
+from unsloth import FastLanguageModel
+
+model, tokenizer = FastLanguageModel.from_pretrained(
+    model_name="unsloth/Llama-3.2-1B-Instruct-bnb-4bit",
+    max_seq_length=2048,
+    dtype=None,
+    load_in_4bit=True,
+)
+
+model = FastLanguageModel.get_peft_model(
+    model,
+    r=16,
+    target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
+    lora_alpha=16,
+    lora_dropout=0,
+    bias="none",
+    use_gradient_checkpointing="unsloth",
+    random_state=3407,
+)
+```
+
+4. Execute o fine-tuning:
+```python
+from trl import SFTTrainer
+from transformers import TrainingArguments
+
+trainer = SFTTrainer(
+    model=model,
+    tokenizer=tokenizer,
+    train_dataset=hf_dataset,
+    dataset_text_field="text",
+    max_seq_length=2048,
+    args=TrainingArguments(
+        per_device_train_batch_size=2,
+        gradient_accumulation_steps=4,
+        warmup_steps=5,
+        max_steps=60,
+        learning_rate=2e-4,
+        logging_steps=1,
+        output_dir="outputs",
+        optim="adamw_8bit",
+        seed=3407,
+        fp16=False,
+        bf16=True,
+    ),
+)
+
+trainer_stats = trainer.train()
+```
+
+5. Salve o modelo treinado:
+```python
+model.save_pretrained("fine_tuned_model")
+tokenizer.save_pretrained("fine_tuned_model")
+```
+
+6. Avalie o modelo com exemplos de teste conforme demonstrado no notebook
+
+## Conclusões e Próximos Passos
+
+### Principais Aprendizados
+- O uso de técnicas de PEFT como LoRA permite realizar fine-tuning eficiente em modelos grandes
+- A preparação adequada dos dados é crucial para o sucesso do fine-tuning
+- O modelo fine-tuned apresenta melhor desempenho na geração de descrições de produtos em comparação com o modelo base
+
+### Próximos Passos
+- Experimentar com diferentes parâmetros de fine-tuning para melhorar ainda mais o desempenho
+- Utilizar o dataset completo para treinamento
+- Implementar métricas quantitativas de avaliação (BLEU, ROUGE, etc.)
+
+## Autor
+
+RODRIGO FERREIRA SANTOS
+
+## Licença
+
+Este projeto está licenciado sob a [Licença MIT](LICENSE).
